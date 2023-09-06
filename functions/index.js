@@ -10,7 +10,12 @@ exports.newUser = functions.auth.user().onCreate((user) => {
       .create(JSON.parse(JSON.stringify(user)));
   });
 
-  
+
+
+exports.hello = functions.https.onRequest((request, response) => {
+  response.send("Word")
+});
+
 exports.updateUsage = functions.firestore.document("users/{userId}/meters/{meter}").onUpdate(async (change, context) => {
     console.log("Meter Changed:", change.after.data());
 
@@ -28,7 +33,7 @@ exports.updateUsage = functions.firestore.document("users/{userId}/meters/{meter
     const previousUsage = data[today.getMonth() + 1][today.getDate()][hour];
 
     if (!previousUsage) {
-      console.log("shit is nan, setting to 0")
+      console.log("New Hour... Checking for leaks")
       data[today.getMonth() + 1][today.getDate()][hour] = 0
     }
 
