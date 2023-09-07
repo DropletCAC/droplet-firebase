@@ -1,5 +1,6 @@
 const functions = require("firebase-functions");
 const admin = require('firebase-admin');
+const fetch = require('node-fetch');
 admin.initializeApp();
 
 
@@ -11,11 +12,6 @@ exports.newUser = functions.auth.user().onCreate((user) => {
   });
 
 
-
-exports.hello = functions.https.onRequest((request, response) => {
-  response.send("Word")
-});
-
 exports.updateUsage = functions.firestore.document("users/{userId}/meters/{meter}").onUpdate(async (change, context) => {
     console.log("Meter Changed:", change.after.data());
 
@@ -25,15 +21,23 @@ exports.updateUsage = functions.firestore.document("users/{userId}/meters/{meter
     const hour = today.getHours();
     const month = today.getMonth() + 1
     const day = today.getDate()
+    const meter = change.after.id;
+    const userId = change.after.ref.parent.parent.id 
 
-    console.log("Attemptnig to access:", month, day, hour)
+    console.log("Attempting to access:", month, day, hour)
     const usage_ref = change.after.ref.collection("usage").doc(today.getFullYear().toString())
     const usage_snap = await usage_ref.get();
     let data = usage_snap.data();
+    
     const previousUsage = data[today.getMonth() + 1][today.getDate()][hour];
 
     if (!previousUsage) {
       console.log("New Hour... Checking for leaks")
+
+      console.log(meter, userId, month, day, hour)
+
+      await fetch(`https://4b39-76-21-126-166.ngrok-free.app/leak?user=${userId}&section=${meter}&month=${month}&day=${day}&hour=${hour - 1}`);
+
       data[today.getMonth() + 1][today.getDate()][hour] = 0
     }
 
