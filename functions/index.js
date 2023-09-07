@@ -3,7 +3,7 @@ const admin = require('firebase-admin');
 const fetch = require('node-fetch');
 admin.initializeApp();
 
-
+const flask_url = "http://localhost:50000/"
 exports.newUser = functions.auth.user().onCreate((user) => {
     return admin.firestore()
       .collection("users")
@@ -36,7 +36,7 @@ exports.updateUsage = functions.firestore.document("users/{userId}/meters/{meter
 
       console.log(meter, userId, month, day, hour)
 
-      await fetch(`https://4b39-76-21-126-166.ngrok-free.app/leak?user=${userId}&section=${meter}&month=${month}&day=${day}&hour=${hour - 1}`);
+      await fetch(`${flask_url}leak?user=${userId}&section=${meter}&month=${month}&day=${day}&hour=${hour - 1}`);
 
       data[today.getMonth() + 1][today.getDate()][hour] = 0
     }
