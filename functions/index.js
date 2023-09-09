@@ -1,9 +1,12 @@
+const { Expo } = require('expo-server-sdk')
 const functions = require("firebase-functions");
 const admin = require('firebase-admin');
 const fetch = require('node-fetch');
 admin.initializeApp();
 
-const flask_url = "http://localhost:50000/"
+const flask_url = "https://6387-76-21-126-166.ngrok-free.app/"
+let expo = new Expo()
+
 exports.newUser = functions.auth.user().onCreate((user) => {
     return admin.firestore()
       .collection("users")
@@ -11,6 +14,48 @@ exports.newUser = functions.auth.user().onCreate((user) => {
       .create(JSON.parse(JSON.stringify(user)));
   });
 
+
+async function sendToExpo(messages) {
+  let chunks = expo.chunkPushNotifications(messages);
+  let tickets = [];
+  (async () => {
+    for (let chunk of chunks) {
+      try {
+        let ticketChunk = await expo.sendPushNotificationsAsync(chunk);
+        console.log(ticketChunk);
+        tickets.push(...ticketChunk);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+  }) ();
+
+  return true
+}
+
+
+async function sendNotifications(userId, leak_data) {
+  const snap = await admin
+    .firestore()
+    .collection("users")
+    .doc(userId)
+    .get()
+  
+  const userData = snap.data()
+  const pushToken = userData['expoPushToken']
+
+  if (!Expo.isExpoPushToken(pushToken)) {
+    console.error(`Push token ${pushToken} is not a valid Expo push token`);
+  }
+  const messages = []
+  messages.push({
+    to: pushToken,
+    sound: 'default',
+    body: `Possible Leak Has Been Detected In: ${leak_data.section}`,
+  })
+
+  return await sendToExpo(messages)
+};
 
 exports.updateUsage = functions.firestore.document("users/{userId}/meters/{meter}").onUpdate(async (change, context) => {
     console.log("Meter Changed:", change.after.data());
@@ -36,7 +81,21 @@ exports.updateUsage = functions.firestore.document("users/{userId}/meters/{meter
 
       console.log(meter, userId, month, day, hour)
 
-      await fetch(`${flask_url}leak?user=${userId}&section=${meter}&month=${month}&day=${day}&hour=${hour - 1}`);
+      const response = await fetch(`${flask_url}leak?user=${userId}&section=${meter}&month=${month}&day=${day}&hour=${hour - 1}`);
+      const leak_data = await response.json()
+      console.log("Leak Data", leak_data)
+
+      if (leak_data.leak) {
+        leak_data.leak.date = new Date(leak_data.leak.date)
+        console.log("Leak Detected!!!")
+        await admin.firestore()
+          .collection("users")
+          .doc(userId)
+          .collection("leaks")
+          .add(leak_data.leak)
+
+        await sendNotifications(userId, leak_data.leak)
+      }
 
       data[today.getMonth() + 1][today.getDate()][hour] = 0
     }
