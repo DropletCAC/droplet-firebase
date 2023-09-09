@@ -4,7 +4,7 @@ const admin = require('firebase-admin');
 const fetch = require('node-fetch');
 admin.initializeApp();
 
-const flask_url = "https://6387-76-21-126-166.ngrok-free.app/"
+const flask_url = "https://bengal-sought-bedbug.ngrok-free.app/"
 let expo = new Expo()
 
 exports.newUser = functions.auth.user().onCreate((user) => {
