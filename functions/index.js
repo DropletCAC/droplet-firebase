@@ -7,13 +7,13 @@ admin.initializeApp();
 const flask_url = "https://bengal-sought-bedbug.ngrok-free.app/"
 let expo = new Expo()
 
+
 exports.newUser = functions.auth.user().onCreate((user) => {
     return admin.firestore()
       .collection("users")
       .doc(user.uid)
       .create(JSON.parse(JSON.stringify(user)));
   });
-
 
 async function sendToExpo(messages) {
   let chunks = expo.chunkPushNotifications(messages);
@@ -58,9 +58,10 @@ async function sendNotifications(userId, leak_data) {
 };
 
 exports.updateUsage = functions.firestore.document("users/{userId}/meters/{meter}").onUpdate(async (change, context) => {
+    console.log("UPDATED")
     console.log("Meter Changed:", change.after.data());
 
-    let currentUsage = change.after.data()['currentUsage'];
+    let currentUsage = parseInt(change.after.data()['currentUsage']);
     //timezone should be kept somewhere in the user metadata
     const today = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Los_Angeles"}));
     const hour = today.getHours();
@@ -82,6 +83,9 @@ exports.updateUsage = functions.firestore.document("users/{userId}/meters/{meter
       console.log(meter, userId, month, day, hour)
 
       const response = await fetch(`${flask_url}leak?user=${userId}&section=${meter}&month=${month}&day=${day}&hour=${hour - 1}`);
+
+      console.log(`${flask_url}leak?user=${userId}&section=${meter}&month=${month}&day=${day}&hour=${hour - 1}`)
+      
       const leak_data = await response.json()
       console.log("Leak Data", leak_data)
 
