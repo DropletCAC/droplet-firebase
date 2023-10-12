@@ -56,7 +56,8 @@ async function sendNotifications(userId, leak_data) {
   messages.push({
     to: pushToken,
     sound: 'default',
-    body: `Possible Leak Has Been Detected In: ${leak_data.section}`,
+    title: 'Possibe Leak Warning!',
+    body: `A Possible Leak Has Been Detected In: ${leak_data.section}`,
   })
 
   return await sendToExpo(messages)
@@ -119,7 +120,7 @@ async function generateTip(userId) {
       .doc(userId)
       .collection("tips")
       .add({
-        content: chatCompletion.choices[0].message.content,
+        content: chatCompletion.choices[0].message.content.replace(/["']/g, ""),
         date: today,
       })
 }
@@ -205,4 +206,43 @@ exports.updateUsage = functions.firestore.document("users/{userId}/meters/{meter
     await total_usage_ref.set(totalData)
 
     return {"success": true}
+});
+
+exports.updateBuckets = functions.firestore.document("users/{userId}/buckets/{bucket}").onUpdate(async (change, context) => {
+  console.log("BUCKET UPDATED");
+  const data = change.after.data()
+  const userId = change.after.ref.parent.parent.id 
+
+  if ((data['currentCapacity'] / data['totalCapacity']) > 0.1) {
+    console.log("Plenty of water!")
+    await change.after.ref.update({sentNotif: false})
+
+  } else if (!data['sentNotif']) {
+    console.log("Water Level Low! Sending notif")
+
+    const snap = await admin
+    .firestore()
+    .collection("users")
+    .doc(userId)
+    .get()
+  
+    const userData = snap.data()
+    const pushToken = userData['expoPushToken']
+
+
+    if (!Expo.isExpoPushToken(pushToken)) {
+      console.error(`Push token ${pushToken} is not a valid Expo push token`);
+    }
+
+    const messages = []
+    messages.push({
+      to: pushToken,
+      sound: 'default',
+      title: "Low Tank Warning!",
+      body: `Your tank "${change.after.id}" is at 10% capacity`,
+    })
+
+    await sendToExpo(messages)
+    await change.after.ref.update({sentNotif: true})
+  }
 });
