@@ -3,10 +3,11 @@ const functions = require("firebase-functions");
 const { defineSecret } = require('firebase-functions/params');
 const admin = require('firebase-admin');
 const fetch = require('node-fetch');
+const {onSchedule} = require("firebase-functions/v2/scheduler");
 
 const { OpenAI } = require('openai');
+const { user } = require('firebase-functions/v1/auth');
 const OPENAI_API_KEY = defineSecret('OPENAI_API_KEY');
-
 
 admin.initializeApp();
 
@@ -244,5 +245,35 @@ exports.updateBuckets = functions.firestore.document("users/{userId}/buckets/{bu
 
     await sendToExpo(messages)
     await change.after.ref.update({sentNotif: true})
+  }
+});
+
+exports.checkPrcp = onSchedule("every day 12:00", async (event) => {
+  const response = await fetch(`${flask_url}prcp`);
+  const data = await response.json()
+  const prcp = data['prcp_in']
+  
+  console.log(prcp)
+
+  if (parseFloat(prcp) > 0.1) {
+      const messages = []
+
+      const usersRef = admin
+        .firestore()
+        .collection("users")
+      
+      const snap = await usersRef.get()
+    
+      snap.forEach(doc => {
+        let expoPushToken = (doc.data().expoPushToken)
+        console.log(expoPushToken)
+        messages.push({
+          to: expoPushToken,
+          title: "Rain Predicted Tommorow!",
+          body: `It is expected to rain ${prcp} inches tommorow, consider switching off your sprinklers to conserve water.`
+        })
+      });
+
+      await sendToExpo(messages)
   }
 });
